@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cd visualizer-app && npm install ../droneviz/pkg && npm install && npm run dev -- --open

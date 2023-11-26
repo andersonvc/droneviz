@@ -1,0 +1,23 @@
+{
+	"name": "visualizer-app",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^2.0.0",
+		"@sveltejs/kit": "^1.27.4",
+		"droneviz": "file:../droneviz/pkg",
+		"svelte": "^4.2.7",
+		"vite": "^4.4.2",
+		"wasm-module-webpack-plugin": "^3.0.0"
+	},
+	"type": "module",
+	"dependencies": {
+		"vite-plugin-wasm": "^3.2.2",
+		"vite-plugin-wasm-pack": "^0.1.12"
+	}
+}
