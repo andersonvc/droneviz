@@ -1,46 +1,145 @@
-struct Drone {
-    x_pos: f64,
-    y_pos: f64,
+use std::f64::consts::PI;
+use js_sys::{Array};
+use rand::Rng;
+
+pub struct Drone {
+    pub x_pos: f64,
+    pub y_pos: f64,
+    pub heading: f64,
+    pub update_rate: f64,
     x_vel: f64,
     y_vel: f64,
+    max_accel:f64,
+    curr_accel:f64,
+    curr_time:f64,
 }
 
 impl Drone {
-    fn new(x_pos: f64, y_pos: f64) -> Self {
+    fn new(x_pos: f64, y_pos: f64, heading: f64, update_rate: f64) -> Self {
         Drone {
             x_pos,
             y_pos,
+            heading: heading % (2.0 * PI),
+            update_rate,
             x_vel: 0.0,
             y_vel: 0.0,
+            max_accel: 0.01,
+            curr_accel: 0.0,
+            curr_time: 0.0,
         }
     }
 
-    fn get_pos(&self) -> (f64, f64) {
-        (self.x_pos, self.y_pos)
+    fn update_acceleration(&mut self, target:f64) {
+        const accel_step: f64 = 0.001;
+        if self.curr_accel < target {
+            self.curr_accel = (self.curr_accel + accel_step).max(self.max_accel);
+        } else {
+            self.curr_accel = (self.curr_accel - accel_step).min(0.0);
+        }
+    }
+
+    fn turn_left(&mut self) {
+        self.heading -= PI / 260.0;
+        self.heading %= 2.0 * PI;
+    }
+
+    fn turn_right(&mut self) {
+        self.heading += PI / 260.0;
+        self.heading %= 2.0 * PI;
     }
 
     fn update_position(&mut self) {
-        let mut rng = rand::thread_rng();
-        self.x_pos += rng.gen_range(-1.0..1.0);
-        self.y_pos += rng.gen_range(-1.0..1.0);
-    }
-}
+        self.x_pos += self.x_vel*self.update_rate;//+0.5*self.curr_accel*self.heading.cos()*self.update_rate*self.update_rate;
+        self.y_pos += self.y_vel*self.update_rate;//+0.5*self.curr_accel*self.heading.sin()*self.update_rate*self.update_rate;
+        self.x_vel += self.curr_accel * self.heading.cos()*self.update_rate;
+        self.y_vel += self.curr_accel * self.heading.sin()*self.update_rate;
 
-
-fn simulation() {
-    let mut drones: Vec<Drone> = Vec::new();
-
-    for _ in 0..50 {
-        let x_pos = rand::thread_rng().gen_range(0.0..100.0);
-        let y_pos = rand::thread_rng().gen_range(0.0..100.0);
-        drones.push(Drone::new(x_pos, y_pos));
+        self.x_vel = self.x_vel.max(-0.15).min(0.15);
+        self.y_vel = self.y_vel.max(-0.15).min(0.15);
     }
 
-    loop {
-        for drone in &mut drones {
-            drone.update_position();
+    fn return_to_center(&mut self, tracking_target: &Drone) {
+        let target_center_x = &tracking_target.x_pos;
+        let target_center_y = &tracking_target.y_pos;
+
+        fn compute_angle(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+            dy.atan2(dx)
         }
 
-        thread::sleep(Duration::from_secs(1));
+        fn compute_distance(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+            (dx.powi(2) + dy.powi(2)).sqrt()
+        }
+
+        let mut curr_angle = compute_angle(self.x_pos,self.y_pos,*target_center_x,*target_center_y)%(2.0*PI);
+        if curr_angle<0.0 {
+            curr_angle = (2.0*PI)+curr_angle;
+        }
+
+        //let vel_angle = compute_angle(self.x_vel,self.y_vel, 0.0, 0.0)%(2.0*PI);
+        let mut required_angle = (curr_angle-self.heading);
+        if required_angle<0.0{
+            required_angle = (2.0*PI)+required_angle;
+        }
+        if (required_angle<PI) || (required_angle>2.0*PI)  {
+            self.turn_right();
+        } else {
+            self.turn_left();
+        }
+
+        //let curr_vel = compute_distance(self.x_vel, self.y_vel, 0.0, 0.0);
+        let curr_dist = compute_distance(self.x_pos, self.y_pos, *target_center_x, *target_center_y);
+        let target_accel = curr_dist*self.max_accel*100.0;///curr_vel/curr_vel;
+        self.update_acceleration(target_accel);
+
+    }
+
+    fn preconfigured_motion(&mut self) {
+        self.x_pos = 0.5 + (2.0*PI*(self.curr_time)/50.0).sin()*0.25;
+        self.curr_time += self.update_rate;
+        self.curr_time %= 100.0;
+        //self.y_pos += (0.25*self.update_rate).sin()
+    }
+
+}
+
+pub struct Simulation {
+    pub drones: Vec<Drone>,
+    pub target: Drone,
+    pub update_rate: f64,
+    rng: rand::rngs::ThreadRng,
+}
+
+impl Simulation {
+    pub fn new(drone_cnt: u32, update_rate: f64) -> Self {
+        let mut tmp_rng = rand::thread_rng();
+        let mut tmp_target = Drone::new(0.5, 0.5, 0.0, update_rate);
+        let mut tmp_drones = Vec::new();
+        for _ in 0..drone_cnt {
+            let x_pos = tmp_rng.gen::<f64>();
+            let y_pos = tmp_rng.gen::<f64>();
+            let heading = tmp_rng.gen::<f64>() * PI;
+            tmp_drones.push(Drone::new(x_pos, y_pos, heading,update_rate));
+        }
+        
+        Simulation {
+            drones: tmp_drones,
+            target: tmp_target,
+            rng: tmp_rng,
+            update_rate: update_rate, // 10ms
+        }
+    }
+
+    pub fn step(&mut self) {
+        self.target.preconfigured_motion();
+        for drone in self.drones.iter_mut() {
+
+            drone.return_to_center(&self.target);
+            drone.update_position();
+            
+        }
     }
 }
