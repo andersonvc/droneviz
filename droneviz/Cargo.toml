@@ -7,6 +7,9 @@ edition = "2018"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "hello"
+
 [features]
 default = ["console_error_panic_hook"]
 
@@ -21,6 +24,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 rand = "0.8.5"
 js-sys = "0.3.65"
 getrandom = { version = "0.2.11", features = ["js-sys", "js"] }
+dfdx = "0.13.0"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
