@@ -1,5 +1,5 @@
 <script>
-    import init, { greet, start_sim,step_sim } from 'droneviz';
+    import init, { start_sim,step_sim } from 'droneviz';
     import { onMount, afterUpdate, onDestroy } from 'svelte';
   
     let droneCount = 100;
